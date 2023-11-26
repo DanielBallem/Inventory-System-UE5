@@ -129,13 +129,13 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void InsertItemIntoInventoryByIndex(FInventorySlot slotDetails, int32 index);
 
-protected:
-
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 		int32 InventoryColSize = 5;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 		int32 InventoryRowSize = 5;
+
+protected:
 
 	// Called when the game starts
 	virtual void BeginPlay() override;
