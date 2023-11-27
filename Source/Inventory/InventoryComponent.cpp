@@ -10,8 +10,6 @@ UInventoryComponent::UInventoryComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
 	InventorySlots.Init(FInventorySlot(), InventoryColSize * InventoryRowSize);
-
-
 	// ...
 }
 
@@ -63,6 +61,29 @@ void UInventoryComponent::InsertItemIntoInventoryByIndex(FInventorySlot slotDeta
 	{
 		InventorySlots[index] = slotDetails;
 	}
+}
+
+int32 UInventoryComponent::CombineStacks(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex)
+{
+	if (!InventorySlots[index].ItemName.IsEqual(other->InventorySlots[otherIndex].ItemName))
+		return 0; //TODO throw exception or log error.
+
+	int32 amount = slotDetails.CurrentAmount;
+	int32 leftover = DropItemIntoInventoryByIndex(index, amount);
+	int32 difference = slotDetails.CurrentAmount - leftover;
+	int32 leftoverOther = other->DropItemIntoInventoryByIndex(otherIndex , -difference);
+	return leftoverOther;
+}
+
+int32 UInventoryComponent::TransferAndMergeStack(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex)
+{
+	if (!InventorySlots[index].ItemName.ToString().Equals(ItemConstants::NO_ITEM_STRING))
+		return 0; //TODO throw exception or log error.
+
+	int32 amount = slotDetails.CurrentAmount;
+	InsertItemIntoInventoryByIndex(slotDetails, index);
+	int32 leftover = other->DropItemIntoInventoryByIndex(otherIndex, -slotDetails.CurrentAmount);
+	return leftover;
 }
 
 /*

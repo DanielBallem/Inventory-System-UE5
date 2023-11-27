@@ -129,6 +129,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void InsertItemIntoInventoryByIndex(FInventorySlot slotDetails, int32 index);
 
+	UFUNCTION(BlueprintCallable)
+		int32 CombineStacks(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex);
+
+	UFUNCTION(BlueprintCallable)
+		int32 TransferAndMergeStack(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 		int32 InventoryColSize = 5;
 
@@ -136,7 +142,6 @@ public:
 		int32 InventoryRowSize = 5;
 
 protected:
-
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	void AddToStacksByName(FName slotToInsert, FName itemName, int32 &outAmount);
