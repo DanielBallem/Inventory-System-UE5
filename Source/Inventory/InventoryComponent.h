@@ -131,10 +131,7 @@ public:
 		FInventoryInputResponse DropItemIntoInventory(FName name, int32 amount);
 
 	UFUNCTION(BlueprintCallable)
-		void SwapInventorySlots(int32 index1, int32 index2);
-
-	UFUNCTION(BlueprintCallable)
-		void SwapInventorySlotsWithOtherInventory(UInventoryComponent* other, int32 otherIndex, int32 myIndex);
+		void SwapInventorySlotsWithOtherInventory(UInventoryComponent* secondInventory, int32 myIndex, int32 otherIndex);
 
 	UFUNCTION(BlueprintCallable)
 		int32 DropItemIntoInventoryByIndex(int32 index, int32 amount);
@@ -143,7 +140,7 @@ public:
 		void InsertItemIntoInventoryByIndex(FInventorySlot slotDetails, int32 index);
 
 	UFUNCTION(BlueprintCallable)
-		int32 CombineStacks(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex);
+		int32 CombineStacks(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 index, int32 sourceIndex);
 
 	UFUNCTION(BlueprintCallable)
 		int32 TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 Toindex, int32 FromIndex);
