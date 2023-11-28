@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright of Daniel Ballem 2023
 
 #pragma once
 
@@ -133,7 +133,7 @@ public:
 		int32 CombineStacks(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex);
 
 	UFUNCTION(BlueprintCallable)
-		int32 TransferAndMergeStack(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex);
+		int32 TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 Toindex, int32 FromIndex);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 		int32 InventoryColSize = 5;
@@ -145,10 +145,14 @@ protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	void AddToStacksByName(FName slotToInsert, FName itemName, int32 &outAmount);
+	FItemMetadata GetItemMetadata(FName);
+	
 
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	static void CheckIndexValidity(TArray<FInventorySlot>* arr, int32 index);
 
 		
 };

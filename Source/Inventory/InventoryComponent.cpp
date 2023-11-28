@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright of Daniel Ballem 2023
 
 
 #include "InventoryComponent.h"
@@ -6,11 +6,7 @@
 // Sets default values for this component's properties
 UInventoryComponent::UInventoryComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
-	InventorySlots.Init(FInventorySlot(), InventoryColSize * InventoryRowSize);
-	// ...
 }
 
 
@@ -29,8 +25,8 @@ FInventoryInputResponse UInventoryComponent::DropItemIntoInventory(FName name, i
 
 void UInventoryComponent::SwapInventorySlots(int32 index1, int32 index2)
 {
-	if (index1 >= InventorySlots.Num() || index2 >= InventorySlots.Num()) return;
-	if (index1 < 0 || index2 < 0) return;
+	CheckIndexValidity(&InventorySlots, index1);
+	CheckIndexValidity(&InventorySlots, index2);
 
 	FInventorySlot slot1 = InventorySlots[index1];
 	InventorySlots[index1] = InventorySlots[index2];
@@ -39,8 +35,8 @@ void UInventoryComponent::SwapInventorySlots(int32 index1, int32 index2)
 
 void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryComponent* other, int32 otherIndex, int32 myIndex)
 {
-	if (otherIndex >= other->InventorySlots.Num() || myIndex >= InventorySlots.Num()) return;
-	if (otherIndex < 0 || myIndex < 0) return;
+	CheckIndexValidity(&other->InventorySlots, otherIndex);
+	CheckIndexValidity(&InventorySlots, myIndex);
 
 	FInventorySlot slot1 = other->InventorySlots[otherIndex];
 	other->InventorySlots[otherIndex] = InventorySlots[myIndex];
@@ -66,7 +62,10 @@ void UInventoryComponent::InsertItemIntoInventoryByIndex(FInventorySlot slotDeta
 int32 UInventoryComponent::CombineStacks(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex)
 {
 	if (!InventorySlots[index].ItemName.IsEqual(other->InventorySlots[otherIndex].ItemName))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot combine stacks of different types"))
 		return 0; //TODO throw exception or log error.
+	}
 
 	int32 amount = slotDetails.CurrentAmount;
 	int32 leftover = DropItemIntoInventoryByIndex(index, amount);
@@ -75,14 +74,20 @@ int32 UInventoryComponent::CombineStacks(UInventoryComponent* other, FInventoryS
 	return leftoverOther;
 }
 
-int32 UInventoryComponent::TransferAndMergeStack(UInventoryComponent* other, FInventorySlot slotDetails, int32 index, int32 otherIndex)
+int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 Toindex, int32 FromIndex)
 {
-	if (!InventorySlots[index].ItemName.ToString().Equals(ItemConstants::NO_ITEM_STRING))
-		return 0; //TODO throw exception or log error.
+	if (!InventorySlots[Toindex].ItemName.ToString().Equals(ItemConstants::NO_ITEM_STRING))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot Transfer to non-empty stack"));
+		return 0;
+	}
 
-	int32 amount = slotDetails.CurrentAmount;
-	InsertItemIntoInventoryByIndex(slotDetails, index);
-	int32 leftover = other->DropItemIntoInventoryByIndex(otherIndex, -slotDetails.CurrentAmount);
+	//insert inventory slot data.
+	int32 amount = transferInventorySlot.CurrentAmount;
+	InsertItemIntoInventoryByIndex(transferInventorySlot, Toindex);
+
+	//officially remove transfered amount from source.
+	int32 leftover = sourceInventory->DropItemIntoInventoryByIndex(FromIndex, -transferInventorySlot.CurrentAmount);
 	return leftover;
 }
 
@@ -98,20 +103,46 @@ void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, 
 		if (slotName.Equals(slotToInsert.ToString()))
 		{
 			slot.ItemName = itemName; //in the case where it's empty. Doesn't matter otherwise
+
+			if (slotToInsert.ToString().Equals(ItemConstants::NO_ITEM_STRING)) 
+				slot.ItemMetadata = GetItemMetadata(itemName);
+			
+			
 			FInventoryInputResponse response = slot.AddToStack(outAmount);
 			outAmount = response.AmountLeft;
+
 			if (outAmount == 0)
 				return;
 		}
 	}
 }
 
+FItemMetadata UInventoryComponent::GetItemMetadata(FName itemName)
+{
+	FItemMetadata* row = nullptr;
+
+	if (ItemTable)
+		row = ItemTable->FindRow<FItemMetadata>(itemName, FString(""));
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("No Item Table set."));
+		return FItemMetadata();
+	}
+
+	if (row)
+		return *row;
+	else
+		UE_LOG(LogTemp, Warning, TEXT("No item row found for %s"), *itemName.ToString());
+
+	return FItemMetadata();
+}
+
 // Called when the game starts
 void UInventoryComponent::BeginPlay()
 {
+	InventorySlots.Init(FInventorySlot(), InventoryColSize * InventoryRowSize);
 	Super::BeginPlay();
 	// ...
-	
 }
 
 
@@ -123,3 +154,9 @@ void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	// ...
 }
 
+void UInventoryComponent::CheckIndexValidity(TArray<FInventorySlot>* arr, int32 index) {
+	if (!arr)
+		UE_LOG(LogTemp, Fatal, TEXT("Inventory Array is null"));
+	if (index < 0 || index >= arr->Num())
+		UE_LOG(LogTemp, Fatal, TEXT("Index %d can't go in array of size %d"), index, arr->Num());
+}
