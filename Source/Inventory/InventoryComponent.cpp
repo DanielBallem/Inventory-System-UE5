@@ -28,6 +28,10 @@ void UInventoryComponent::SwapInventorySlots(int32 index1, int32 index2)
 	CheckIndexValidity(&InventorySlots, index1);
 	CheckIndexValidity(&InventorySlots, index2);
 
+	//cancels swap
+	if (!InventorySlots[index1].DoesItemSlotTypeMatchRestriction(InventorySlots[index2].ItemMetadata.type))
+		return;
+
 	FInventorySlot slot1 = InventorySlots[index1];
 	InventorySlots[index1] = InventorySlots[index2];
 	InventorySlots[index2] = slot1;
@@ -38,9 +42,28 @@ void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryCompone
 	CheckIndexValidity(&other->InventorySlots, otherIndex);
 	CheckIndexValidity(&InventorySlots, myIndex);
 
-	FInventorySlot slot1 = other->InventorySlots[otherIndex];
-	other->InventorySlots[otherIndex] = InventorySlots[myIndex];
-	InventorySlots[myIndex] = slot1;
+	//should swap IF:
+	//restriction of myself matches incoming item OR
+	//My slot restriction -> NONE
+
+	if (InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(other->InventorySlots[otherIndex].ItemMetadata.type))
+	{
+		ItemType otherRestriction = other->InventorySlots[otherIndex].ItemSlotTypeRestriction;
+		ItemType mySlotRestriction = InventorySlots[myIndex].ItemSlotTypeRestriction;
+
+		FInventorySlot slot1 = other->InventorySlots[otherIndex];
+		other->InventorySlots[otherIndex] = InventorySlots[myIndex];
+		InventorySlots[myIndex] = slot1;
+
+		//preserve slot restrictions
+		other->InventorySlots[otherIndex].ItemSlotTypeRestriction = otherRestriction;
+		InventorySlots[myIndex].ItemSlotTypeRestriction = mySlotRestriction;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot swap slots with incompatible item types."));
+		return; // Prevent swapping if item types are incompatible
+	}
 }
 
 //returns amount left over
@@ -53,7 +76,7 @@ int32 UInventoryComponent::DropItemIntoInventoryByIndex(int32 index, int32 amoun
 
 void UInventoryComponent::InsertItemIntoInventoryByIndex(FInventorySlot slotDetails, int32 index)
 {
-	if (InventorySlots[index].ItemName == ItemConstants::NO_ITEM_STRING)
+	if (InventorySlots[index].ItemName == ItemConstants::NO_ITEM_STRING && InventorySlots[index].DoesItemSlotTypeMatchRestriction(slotDetails.ItemMetadata.type))
 	{
 		InventorySlots[index] = slotDetails;
 	}
@@ -82,8 +105,13 @@ int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sou
 		return 0;
 	}
 
-	//insert inventory slot data.
 	int32 amount = transferInventorySlot.CurrentAmount;
+
+	//cancels transfer if item slot restriction won't allow it.
+	if (!InventorySlots[Toindex].DoesItemSlotTypeMatchRestriction(transferInventorySlot.ItemMetadata.type))
+		return amount;
+
+	//insert inventory slot data.
 	InsertItemIntoInventoryByIndex(transferInventorySlot, Toindex);
 
 	//officially remove transfered amount from source.
@@ -92,7 +120,8 @@ int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sou
 }
 
 /*
-	TODO: Use hash map to store locations of shared items so it doesn't need to traverse the whole inventory.
+	Iterates through all slots with the name `slotToInsert`, and tries to insert `itemName` into it.
+	Sets item metadata as inserting into inventories is the way they are instantiated.
 */
 void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, int32 &outAmount)
 {
@@ -102,14 +131,26 @@ void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, 
 		FString slotName = slot.ItemName.ToString();
 		if (slotName.Equals(slotToInsert.ToString()))
 		{
-			slot.ItemName = itemName; //in the case where it's empty. Doesn't matter otherwise
 
-			if (slotToInsert.ToString().Equals(ItemConstants::NO_ITEM_STRING)) 
-				slot.ItemMetadata = GetItemMetadata(itemName);
-			
-			
-			FInventoryInputResponse response = slot.AddToStack(outAmount);
-			outAmount = response.AmountLeft;
+			//inserting into an empty slot, populate item data.
+			if (slotToInsert.ToString().Equals(ItemConstants::NO_ITEM_STRING))
+			{
+				FItemMetadata itemMetadata = GetItemMetadata(itemName);
+
+				if (slot.DoesItemSlotTypeMatchRestriction(itemMetadata.type)) 
+				{
+					slot.ItemMetadata = itemMetadata;
+
+					slot.ItemName = itemName; //in the case where it's empty. Doesn't matter otherwise
+
+					FInventoryInputResponse response = slot.AddToStack(outAmount);
+					outAmount = response.AmountLeft;
+				}
+				else 
+				{
+					continue;
+				}
+			}
 
 			if (outAmount == 0)
 				return;

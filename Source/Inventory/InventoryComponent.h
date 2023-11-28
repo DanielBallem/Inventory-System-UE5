@@ -14,7 +14,12 @@ namespace ItemConstants
 
 UENUM(BlueprintType)
 enum class ItemType : uint8 {
-	RESOURCE = 0 UMETA(DisplayName = "RESOURCE")
+	NONE = 0 UMETA(DisplayName = "NONE"),
+	RESOURCE = 1 UMETA(DisplayName = "RESOURCE"),
+	HEADGEAR = 2 UMETA(DisplayName = "HEADGEAR"),
+	CHESTGEAR = 3 UMETA(DisplayName = "CHESTGEAR"),
+	LEGGING = 4 UMETA(DisplayName = "LEGGING"),
+	FOOTGEAR = 5 UMETA(DisplayName = "FOOTGEAR")
 };
 
 USTRUCT(BlueprintType)
@@ -68,10 +73,14 @@ struct FInventorySlot
 	UPROPERTY(BlueprintReadWrite)
 		FItemMetadata ItemMetadata;
 
+	UPROPERTY(BlueprintReadWrite)
+		ItemType ItemSlotTypeRestriction;
+
 	FInventorySlot() {
 		ItemName = FName(ItemConstants::NO_ITEM_STRING);
 		CurrentAmount = 0;
 		ItemMetadata = FItemMetadata();
+		ItemSlotTypeRestriction = ItemType::NONE;
 	}
 
 	FInventoryInputResponse AddToStack(int32 amount) {
@@ -93,7 +102,10 @@ struct FInventorySlot
 			ItemName = FName(ItemConstants::NO_ITEM_STRING);
 
 		return FInventoryInputResponse(leftover, true);
+	}
 
+	bool DoesItemSlotTypeMatchRestriction(ItemType type) {
+		return ItemSlotTypeRestriction == type || ItemSlotTypeRestriction == ItemType::NONE;
 	}
 };
 
