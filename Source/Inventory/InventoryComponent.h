@@ -34,7 +34,7 @@ struct FItemMetadata : public FTableRowBase {
 
 	FItemMetadata() {
 		MaxStackAmount = 64;
-		type = ItemType::RESOURCE;
+		type = ItemType::NONE;
 	}
 };
 
@@ -104,8 +104,9 @@ struct FInventorySlot
 		return FInventoryInputResponse(leftover, true);
 	}
 
+	//Item slots allow items into it if the slot restriction is none, the item matches the restriction, or if the type is empty (NONE)
 	bool DoesItemSlotTypeMatchRestriction(ItemType type) {
-		return ItemSlotTypeRestriction == type || ItemSlotTypeRestriction == ItemType::NONE;
+		return ItemSlotTypeRestriction == type || ItemSlotTypeRestriction == ItemType::NONE || type == ItemType::NONE;
 	}
 };
 

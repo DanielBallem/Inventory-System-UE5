@@ -43,10 +43,9 @@ void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryCompone
 	CheckIndexValidity(&InventorySlots, myIndex);
 
 	//should swap IF:
-	//restriction of myself matches incoming item OR
-	//My slot restriction -> NONE
+	//restriction of myself -> restriction of the other.
 
-	if (InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(other->InventorySlots[otherIndex].ItemMetadata.type))
+	if (InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(other->InventorySlots[otherIndex].ItemMetadata.type) && other->InventorySlots[otherIndex].DoesItemSlotTypeMatchRestriction(InventorySlots[myIndex].ItemMetadata.type))
 	{
 		ItemType otherRestriction = other->InventorySlots[otherIndex].ItemSlotTypeRestriction;
 		ItemType mySlotRestriction = InventorySlots[myIndex].ItemSlotTypeRestriction;
@@ -137,20 +136,12 @@ void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, 
 			{
 				FItemMetadata itemMetadata = GetItemMetadata(itemName);
 
-				if (slot.DoesItemSlotTypeMatchRestriction(itemMetadata.type)) 
-				{
-					slot.ItemMetadata = itemMetadata;
+				slot.ItemMetadata = itemMetadata;
 
-					slot.ItemName = itemName; //in the case where it's empty. Doesn't matter otherwise
-
-					FInventoryInputResponse response = slot.AddToStack(outAmount);
-					outAmount = response.AmountLeft;
-				}
-				else 
-				{
-					continue;
-				}
+				slot.ItemName = itemName;
 			}
+			FInventoryInputResponse response = slot.AddToStack(outAmount);
+			outAmount = response.AmountLeft;
 
 			if (outAmount == 0)
 				return;
