@@ -18,9 +18,8 @@ FInventoryInputResponse UInventoryComponent::DropItemIntoInventory(FName name, i
 		return FInventoryInputResponse(0, true);
 	AddToStacksByName(FName(ItemConstants::NO_ITEM_STRING), name, amount);
 	
-	if (amount == originalAmount)
-		return FInventoryInputResponse(amount, false);
-	return FInventoryInputResponse(amount, true);
+	bool amountChanged = amount == originalAmount;
+	return FInventoryInputResponse(amount, amountChanged);
 }
 
 void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryComponent* secondInventory, int32 myIndex, int32 otherIndex)
@@ -28,11 +27,10 @@ void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryCompone
 	CheckIndexValidity(&secondInventory->InventorySlots, otherIndex);
 	CheckIndexValidity(&InventorySlots, myIndex);
 
-	//should swap IF:
-	//restriction of myself -> restriction of the other.
-
+	//should swap if both items are swapping into compatable slots. 
 	if (InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(secondInventory->InventorySlots[otherIndex].ItemMetadata.type) && secondInventory->InventorySlots[otherIndex].DoesItemSlotTypeMatchRestriction(InventorySlots[myIndex].ItemMetadata.type))
 	{
+		//preserving restrictions of slots while swapping everything else.
 		ItemType otherRestriction = secondInventory->InventorySlots[otherIndex].ItemSlotTypeRestriction;
 		ItemType mySlotRestriction = InventorySlots[myIndex].ItemSlotTypeRestriction;
 
@@ -55,8 +53,7 @@ void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryCompone
 int32 UInventoryComponent::DropItemIntoInventoryByIndex(int32 index, int32 amount)
 {
 	FInventorySlot& slot = InventorySlots[index];
-	FInventoryInputResponse response = slot.AddToStack(amount);
-	return response.AmountLeft;
+	return slot.AddToStack(amount);
 }
 
 void UInventoryComponent::InsertItemIntoInventoryByIndex(FInventorySlot slotDetails, int32 index)
@@ -72,7 +69,7 @@ int32 UInventoryComponent::CombineStacks(UInventoryComponent* sourceInventory, F
 	if (!InventorySlots[index].ItemName.IsEqual(sourceInventory->InventorySlots[sourceIndex].ItemName))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Cannot combine stacks of different types"))
-		return 0; //TODO throw exception or log error.
+		return 0;
 	}
 
 	int32 amount = transferInventorySlot.CurrentAmount;
@@ -123,11 +120,10 @@ void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, 
 				FItemMetadata itemMetadata = GetItemMetadata(itemName);
 
 				slot.ItemMetadata = itemMetadata;
-
 				slot.ItemName = itemName;
 			}
-			FInventoryInputResponse response = slot.AddToStack(outAmount);
-			outAmount = response.AmountLeft;
+
+			outAmount = slot.AddToStack(outAmount);
 
 			if (outAmount == 0)
 				return;
