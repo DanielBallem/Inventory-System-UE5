@@ -1,25 +1,21 @@
 // Copyright of Daniel Ballem 2023
-
-
 #include "InventoryComponent.h"
 
-// Sets default values for this component's properties
 UInventoryComponent::UInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-
-FInventoryInputResponse UInventoryComponent::DropItemIntoInventory(FName name, int32 amount)
+int32 UInventoryComponent::DropItemIntoInventory(FName name, int32 amount)
 {
-	int originalAmount = amount;
 	AddToStacksByName(name, name, amount);
-	if (amount == 0)
-		return FInventoryInputResponse(0, true);
-	AddToStacksByName(FName(ItemConstants::NO_ITEM_STRING), name, amount);
 	
-	bool amountChanged = amount == originalAmount;
-	return FInventoryInputResponse(amount, amountChanged);
+	if (amount == 0)
+		return 0;
+
+	AddToStacksByName(FName(ItemConstants::NO_ITEM_STRING), name, amount);
+
+	return amount;
 }
 
 void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryComponent* secondInventory, int32 myIndex, int32 otherIndex)
@@ -28,25 +24,31 @@ void UInventoryComponent::SwapInventorySlotsWithOtherInventory(UInventoryCompone
 	CheckIndexValidity(&InventorySlots, myIndex);
 
 	//should swap if both items are swapping into compatable slots. 
-	if (InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(secondInventory->InventorySlots[otherIndex].ItemMetadata.type) && secondInventory->InventorySlots[otherIndex].DoesItemSlotTypeMatchRestriction(InventorySlots[myIndex].ItemMetadata.type))
-	{
-		//preserving restrictions of slots while swapping everything else.
-		ItemType otherRestriction = secondInventory->InventorySlots[otherIndex].ItemSlotTypeRestriction;
-		ItemType mySlotRestriction = InventorySlots[myIndex].ItemSlotTypeRestriction;
-
-		FInventorySlot slot1 = secondInventory->InventorySlots[otherIndex];
-		secondInventory->InventorySlots[otherIndex] = InventorySlots[myIndex];
-		InventorySlots[myIndex] = slot1;
-
-		//preserve slot restrictions
-		secondInventory->InventorySlots[otherIndex].ItemSlotTypeRestriction = otherRestriction;
-		InventorySlots[myIndex].ItemSlotTypeRestriction = mySlotRestriction;
-	}
+	if (AreSlotsCompatibleForSwapping(myIndex, secondInventory, otherIndex))
+		SwapCompatibleInventorySlots(secondInventory, otherIndex, myIndex);
 	else
-	{
 		UE_LOG(LogTemp, Warning, TEXT("Cannot swap slots with incompatible item types."));
-		return; // Prevent swapping if item types are incompatible
-	}
+	
+}
+
+bool UInventoryComponent::AreSlotsCompatibleForSwapping(const int32& myIndex, UInventoryComponent* secondInventory, const int32& otherIndex)
+{
+	return InventorySlots[myIndex].DoesItemSlotTypeMatchRestriction(secondInventory->InventorySlots[otherIndex].ItemMetadata.type) && secondInventory->InventorySlots[otherIndex].DoesItemSlotTypeMatchRestriction(InventorySlots[myIndex].ItemMetadata.type);
+}
+
+void UInventoryComponent::SwapCompatibleInventorySlots(UInventoryComponent* secondInventory, const int32& otherIndex, const int32& myIndex)
+{
+	//preserving restrictions of slots while swapping everything else.
+	ItemType otherRestriction = secondInventory->InventorySlots[otherIndex].ItemSlotTypeRestriction;
+	ItemType mySlotRestriction = InventorySlots[myIndex].ItemSlotTypeRestriction;
+
+	FInventorySlot slot1 = secondInventory->InventorySlots[otherIndex];
+	secondInventory->InventorySlots[otherIndex] = InventorySlots[myIndex];
+	InventorySlots[myIndex] = slot1;
+
+	//preserve slot restrictions
+	secondInventory->InventorySlots[otherIndex].ItemSlotTypeRestriction = otherRestriction;
+	InventorySlots[myIndex].ItemSlotTypeRestriction = mySlotRestriction;
 }
 
 //returns amount left over
@@ -79,9 +81,9 @@ int32 UInventoryComponent::CombineStacks(UInventoryComponent* sourceInventory, F
 	return leftoverOther;
 }
 
-int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 Toindex, int32 FromIndex)
+int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 toIndex, int32 fromIndex)
 {
-	if (!InventorySlots[Toindex].ItemName.ToString().Equals(ItemConstants::NO_ITEM_STRING))
+	if (!InventorySlots[toIndex].ItemName.ToString().Equals(ItemConstants::NO_ITEM_STRING))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Cannot Transfer to non-empty stack"));
 		return 0;
@@ -90,21 +92,17 @@ int32 UInventoryComponent::TransferAndMergeToEmptyStack(UInventoryComponent* sou
 	int32 amount = transferInventorySlot.CurrentAmount;
 
 	//cancels transfer if item slot restriction won't allow it.
-	if (!InventorySlots[Toindex].DoesItemSlotTypeMatchRestriction(transferInventorySlot.ItemMetadata.type))
+	if (!InventorySlots[toIndex].DoesItemSlotTypeMatchRestriction(transferInventorySlot.ItemMetadata.type))
 		return amount;
 
 	//insert inventory slot data.
-	InsertItemIntoInventoryByIndex(transferInventorySlot, Toindex);
+	InsertItemIntoInventoryByIndex(transferInventorySlot, toIndex);
 
 	//officially remove transfered amount from source.
-	int32 leftover = sourceInventory->DropItemIntoInventoryByIndex(FromIndex, -transferInventorySlot.CurrentAmount);
+	int32 leftover = sourceInventory->DropItemIntoInventoryByIndex(fromIndex, -transferInventorySlot.CurrentAmount);
 	return leftover;
 }
 
-/*
-	Iterates through all slots with the name `slotToInsert`, and tries to insert `itemName` into it.
-	Sets item metadata as inserting into inventories is the way they are instantiated.
-*/
 void UInventoryComponent::AddToStacksByName(FName slotToInsert, FName itemName, int32 &outAmount)
 {
 	for (int32 i = 0; i < InventoryColSize * InventoryRowSize; i++)
@@ -156,7 +154,6 @@ void UInventoryComponent::BeginPlay()
 {
 	InventorySlots.Init(FInventorySlot(), InventoryColSize * InventoryRowSize);
 	Super::BeginPlay();
-	// ...
 }
 
 
@@ -164,8 +161,6 @@ void UInventoryComponent::BeginPlay()
 void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
 }
 
 void UInventoryComponent::CheckIndexValidity(TArray<FInventorySlot>* arr, int32 index) {

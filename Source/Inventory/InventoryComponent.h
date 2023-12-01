@@ -42,27 +42,6 @@ struct FItemMetadata : public FTableRowBase {
 };
 
 USTRUCT(BlueprintType)
-struct FInventoryInputResponse
-{
-	GENERATED_USTRUCT_BODY()
-
-		UPROPERTY(BlueprintReadOnly)
-		int32 AmountLeft;
-
-	UPROPERTY(BlueprintReadOnly)
-		bool bSuccess;
-
-	FInventoryInputResponse() {
-		AmountLeft = 0;
-		bSuccess = true;
-	}
-	FInventoryInputResponse(int amountLeft, bool bSuccessful) {
-		AmountLeft = amountLeft;
-		bSuccess = bSuccessful;
-	}
-};
-
-USTRUCT(BlueprintType)
 struct FInventorySlot
 {
 	GENERATED_USTRUCT_BODY()
@@ -147,7 +126,7 @@ public:
 	  @return The amount that could not be deposited into the inventory, due to there being insufficient space.
 	 */
 	UFUNCTION(BlueprintCallable)
-		FInventoryInputResponse DropItemIntoInventory(FName name, int32 amount);
+		int32 DropItemIntoInventory(FName name, int32 amount);
 
 	/*
 		Attempts to swap inventory slot items with inventory referenced. Will cancel the swap if items attempt to enter a slot with an incompatable restriction. (Example, placing a resource in an armour slot).
@@ -208,7 +187,7 @@ public:
 		@return The amount leftover that could not be inserted into the destination index due to max stack size.
  */
 	UFUNCTION(BlueprintCallable)
-		int32 TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 Toindex, int32 FromIndex);
+		int32 TransferAndMergeToEmptyStack(UInventoryComponent* sourceInventory, FInventorySlot transferInventorySlot, int32 toIndex, int32 fromIndex);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 		int32 InventoryColSize = 5;
@@ -217,14 +196,21 @@ public:
 		int32 InventoryRowSize = 5;
 
 protected:
-	// Called when the game starts
 	virtual void BeginPlay() override;
-	void AddToStacksByName(FName slotToInsert, FName itemName, int32 &outAmount);
+	bool AreSlotsCompatibleForSwapping(const int32& myIndex, UInventoryComponent* secondInventory, const int32& otherIndex);
 
 	/*
 		@return the FItemMetadata row in metadata table if it exists. Otherwise, returns a default FItemMetaData
 	*/
 	FItemMetadata GetItemMetadata(FName);
+
+private:
+	/*
+	Iterates through all slots with the name `slotToInsert`, and tries to insert `itemName` into it.
+	Sets item metadata if inserting into empty slots. Refer to the ItemConstants namespace to get the string denoting an empty slot. 
+	*/
+	void AddToStacksByName(FName slotToInsert, FName itemName, int32& outAmount);
+	void SwapCompatibleInventorySlots(UInventoryComponent* secondInventory, const int32& otherIndex, const int32& myIndex);
 
 public:	
 	// Called every frame
